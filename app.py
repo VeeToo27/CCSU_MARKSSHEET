@@ -1,39 +1,83 @@
 import streamlit as st
 import pandas as pd
-from playwright.sync_api import sync_playwright
+import requests
+from bs4 import BeautifulSoup
+from io import BytesIO
 
-st.title("Marksheet Monitor")
+st.set_page_config(page_title="CCSU Result Collector")
 
-if st.button("Start Browser"):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+st.title("CCSU Result Collector")
 
-        page = browser.new_page()
+uploaded_file = st.file_uploader(
+    "Upload Excel with Roll Numbers",
+    type=["xlsx"]
+)
 
-        def handle_navigation(frame):
-            url = frame.url
+if uploaded_file:
+    rolls_df = pd.read_excel(uploaded_file)
 
-            if "marksheet" in url.lower():
-                st.write("Marksheet detected")
+    st.write("Roll Numbers Found:", len(rolls_df))
 
-                # extract data here
-                data = {
-                    "Roll": "123",
-                    "Name": "Student",
-                    "Maths": 85,
-                    "Physics": 88
-                }
+    captcha_text = st.text_input("Enter CAPTCHA")
 
-                df = pd.DataFrame([data])
+    if st.button("Fetch Results"):
 
-                try:
-                    old = pd.read_excel("marks.xlsx")
-                    df = pd.concat([old, df])
-                except:
-                    pass
+        session = requests.Session()
 
-                df.to_excel("marks.xlsx", index=False)
+        all_results = []
 
-        page.on("framenavigated", handle_navigation)
+        for _, row in rolls_df.iterrows():
 
-        page.goto("https://example.com")
+            roll_no = str(row["RollNo"])
+
+            payload = {
+                # REPLACE THESE WITH REAL FIELD NAMES
+                "rollno": roll_no,
+                "captcha": captcha_text
+            }
+
+            response = session.post(
+                "https://result.ccsuniversityweb.in/",
+                data=payload
+            )
+
+            soup = BeautifulSoup(response.text, "lxml")
+
+            try:
+                student_name = soup.select_one(
+                    ".student-name"
+                ).text.strip()
+
+                result_status = soup.select_one(
+                    ".result-status"
+                ).text.strip()
+
+                all_results.append({
+                    "RollNo": roll_no,
+                    "Name": student_name,
+                    "Result": result_status
+                })
+
+            except Exception as e:
+
+                all_results.append({
+                    "RollNo": roll_no,
+                    "Name": "",
+                    "Result": f"ERROR: {e}"
+                })
+
+        final_df = pd.DataFrame(all_results)
+
+        final_df.to_excel(
+            "ccsu_results.xlsx",
+            index=False
+        )
+
+        st.dataframe(final_df)
+
+        with open("ccsu_results.xlsx", "rb") as f:
+            st.download_button(
+                "Download Excel",
+                f,
+                file_name="ccsu_results.xlsx"
+            )
