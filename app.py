@@ -1,9 +1,17 @@
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
-url = st.text_input("URL")
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
 
-if st.button("Fetch Source"):
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    st.code(r.text, language="html")
+    def on_response(response):
+        req = response.request
+        if req.resource_type in ["fetch", "xhr"]:
+            print(req.url)
+
+    page.on("response", on_response)
+
+    page.goto("https://example.com")
+    page.wait_for_timeout(5000)
+
+    browser.close()
