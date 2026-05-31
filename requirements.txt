@@ -1,5 +1,3 @@
 streamlit
-playwright
-pandas
-openpyxl
-xlsxwriter
+requests
+beautifulsoup4
