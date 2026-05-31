@@ -26,15 +26,14 @@ url = st.text_input(
 )
 
 if st.button("Scan"):
-
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    xhr_requests = []
+    # Use session state to guarantee data persistence during the run
+    st.session_state["xhr_requests"] = {}
 
     try:
         with sync_playwright() as p:
-
             browser = p.chromium.launch(
                 headless=True,
                 args=[
@@ -44,57 +43,46 @@ if st.button("Scan"):
                     "--disable-gpu"
                 ]
             )
-
+            
             page = browser.new_page()
 
+            # Real-time deduplication using URL as a dictionary key
             def handle_response(response):
                 try:
                     req = response.request
-
                     if req.resource_type in ["xhr", "fetch"]:
-                        xhr_requests.append({
+                        st.session_state["xhr_requests"][req.url] = {
                             "method": req.method,
-                            "url": req.url,
                             "status": response.status
-                        })
-
+                        }
                 except Exception:
                     pass
 
             page.on("response", handle_response)
 
+            # Changed to networkidle to ensure background fetch requests complete
             page.goto(
                 url,
-                wait_until="domcontentloaded",
+                wait_until="networkidle",
                 timeout=90000
             )
 
-            page.wait_for_timeout(10000)
+            page.wait_for_timeout(5000)
 
             st.success(f"Title: {page.title()}")
-
-            screenshot = page.screenshot(full_page=True)
+            
+            screenshot = page.screenshot(full_page=False)
             st.image(screenshot)
-
+            
             browser.close()
 
         st.subheader("Captured Fetch/XHR Requests")
 
-        if xhr_requests:
-
-            unique_urls = set()
-
-            for req in xhr_requests:
-
-                if req["url"] in unique_urls:
-                    continue
-
-                unique_urls.add(req["url"])
-
+        if st.session_state["xhr_requests"]:
+            for req_url, data in st.session_state["xhr_requests"].items():
                 st.code(
-                    f'{req["status"]} | {req["method"]} | {req["url"]}'
+                    f'{data["status"]} | {data["method"]} | {req_url}'
                 )
-
         else:
             st.warning("No Fetch/XHR requests detected.")
 
