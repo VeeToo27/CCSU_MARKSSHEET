@@ -1,17 +1,10 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+import asyncio
+from playwright.async_api import async_playwright
 
-# App configurations
-st.set_page_config(
-    page_title="CCSU Portal Viewer", 
-    page_icon="🎓", 
-    layout="wide"
-)
-
-st.title("🎓 CCSU Result Portal Gateway")
-st.caption("Accessing: https://result.ccsuniversityweb.in/ safely via cloud container.")
+st.set_page_config(page_title="Cloud Portal Monitor", page_icon="🌐", layout="wide")
+st.title("🌐 Cloud Browser Network Monitor")
+st.caption("Tracking Fetch/XHR background events on Streamlit Cloud servers safely.")
 
 TARGET_URL = "https://result.ccsuniversityweb.in/"
 
